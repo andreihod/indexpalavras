@@ -2,14 +2,12 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.text.Normalizer;
-import java.util.Collections;
-import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedList;
+import java.util.Map;
+import java.util.Scanner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -19,11 +17,11 @@ public class IndexPalavras {
 	public int processados = 0;
 	
 	// Guarda palavras e seus respectivos ids
-	private ConcurrentHashMap<String, Integer> hashPalavras = new ConcurrentHashMap<>();
+	private HashMap<String, Integer> hashPalavras = new HashMap<>();
 	// Guarda livros e seus respectivos ids 
-	private ConcurrentHashMap<String, Integer> hashLivros = new ConcurrentHashMap<>();
+	private HashMap<Integer, String> hashLivros = new HashMap<>();
 	// Guarda o id da palavra e o livro/linha onde se encontra
-	private ConcurrentHashMap<Integer, ConcurrentHashMap<Integer, Integer>> hashPalavraLivros = new ConcurrentHashMap<>();
+	private ConcurrentHashMap<Integer, ConcurrentHashMap<Integer, ArrayList<Integer>>> hashPalavraLivros = new ConcurrentHashMap<>();
 	
 	private int lastPalavraId = 0;
 	private int lastLivroId = 0;
@@ -32,7 +30,6 @@ public class IndexPalavras {
 		
 		long t1 = 0;
 		long t2 = 0;
-		long t3 = 0;
 		
 		File folder = new File("./livros/");
 		File[] listOfFiles = folder.listFiles();
@@ -84,41 +81,101 @@ public class IndexPalavras {
 		}
 
 		t2 = System.nanoTime();
+		
+		System.out.println("Número de palavras: " + hashPalavras.size());
+		System.out.println("Número de Livros: " + hashLivros.size());	
 
-		System.out.println("Time Processing " + ((t2 - t1) / 1000000.0));
-		//System.out.println("Time Sort " + ((t3 - t2) / 1000000.0));
+		System.out.println("Time Indexing " + ((t2 - t1) / 1000000.0));
+		
+		Scanner keyboard = new Scanner(System.in);
+		
+		boolean exit = false;
+		while(!exit){
+			System.out.println("(0 = sair) Digite uma palavra: ");
+			String palavra = keyboard.nextLine();
+			if (!palavra.equals("0")) {
+				palavra = palavra.toLowerCase();
+				if (!hashPalavras.containsKey(palavra)){
+					System.out.println("Palavra não encontrada!");
+				} else {
+					int idPalavra = hashPalavras.get(palavra);
+					ConcurrentHashMap<Integer, ArrayList<Integer>> livrosEncontrados = hashPalavraLivros.get(idPalavra);
+					for (Map.Entry<Integer, ArrayList<Integer>> livro : livrosEncontrados.entrySet()) {
+					    Integer livroId = livro.getKey();
+					    ArrayList<Integer> linhasEncontradas = livro.getValue();
+					    String filename = this.hashLivros.get(livroId);
+					    this.buscaLinhasLivro(palavra, filename, linhasEncontradas);
+					}
+				}
+			} else {
+				exit = true;
+			}
+		}
+		
+		keyboard.close();		
+		System.out.println("Encerrando");
+
+	}
+
+	private void buscaLinhasLivro(String palavra, String filename, ArrayList<Integer> linhasEncontradas) {
+		try {
+			FileReader fr = new FileReader(filename);
+			BufferedReader bfr = new BufferedReader(fr);
+			String line = "";
+			int lineNumber = 0; // controla o número da linha
+			while ((line = bfr.readLine()) != null) {
+				line = this.normalizeLine(line); // usando a mesma normalização da indexação
+				if (linhasEncontradas.contains(lineNumber))				
+					System.out.println(filename + " | linha " + lineNumber + " -> " + line.replaceAll("\\b"+palavra+"\\b", "<<"+palavra+">>"));
+				lineNumber++;
+			}
+			bfr.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 
 	private void processaArquivo(String filename) {
 		try {
 			FileReader fr = new FileReader(filename);
 			BufferedReader bfr = new BufferedReader(fr);
+			
+			// Colocar livro no hash de livros gerando um id
+			int livroId = this.getLivroId(filename);
 
 			String line = "";
 
-			int lineNumber = 0;
+			int lineNumber = 0; // controla o número da linha
 			while ((line = bfr.readLine()) != null) {
-				line = Normalizer.normalize(line, Normalizer.Form.NFD);
-				line = line.replaceAll("[\\p{InCombiningDiacriticalMarks}]", "");
-				line = line.replaceAll("[^a-zA-Z ]", " ");
-				line = line.toLowerCase();
+				
+				line = this.normalizeLine(line);
 				String str[] = line.split(" ");
+				
 				for (int i = 0; i < str.length; i++) {
-					if (str[i].length() > 0 && str[i].length() < 30) {						
+					if (str[i].length() > 0 && str[i].length() < 30) {	
+						
+						// Coloca palavra no hash (se não existe) e retorna um id
 						int palavraId = this.getPalavraId(str[i]);
-						int livroId = this.getLivroId(filename);
-						if (hashPalavraLivros.containsKey(palavraId)) {
-							ConcurrentHashMap<Integer, Integer> livroLinhas = hashPalavraLivros.get(palavraId);
-							if (livroLinhas.containsKey(livroId)) {
-								
+						
+						if (this.hashPalavraLivros.containsKey(palavraId)) { // Palavra já existe
+							ConcurrentHashMap<Integer, ArrayList<Integer>> livroLinhas = this.hashPalavraLivros.get(palavraId);
+							if (livroLinhas.containsKey(livroId)) { // Livro já existe na palavra
+								ArrayList<Integer> linhas = livroLinhas.get(livroId);
+								if (!linhas.contains(lineNumber)){ // Caso exista a mesma palavra no mesmo livro e na mesma linha 
+									linhas.add(lineNumber); // Adiciona linha
+								}
 							} else {
-								
+								ArrayList<Integer> linhas = new ArrayList<Integer>();
+								linhas.add(lineNumber);
+								livroLinhas.put(livroId, linhas);
 							}
 						} else {
-							ConcurrentHashMap<Integer, Integer> livroLinhas = new ConcurrentHashMap<Integer, Integer>();
-							livroLinhas.put(livroId, lineNumber);
-							//TO-DO: Precisa poder adicionar várias linhas para o mesmo livro, usar ArrayList?
-							hashPalavraLivros.put(palavraId, livroLinhas);
+							ConcurrentHashMap<Integer, ArrayList<Integer>> livroLinhas = new ConcurrentHashMap<Integer, ArrayList<Integer>>();
+							ArrayList<Integer> linhas = new ArrayList<Integer>();
+							linhas.add(lineNumber);
+							livroLinhas.put(livroId, linhas);
+							this.hashPalavraLivros.put(palavraId, livroLinhas);
 						}
 						wpc++;
 					}
@@ -135,7 +192,15 @@ public class IndexPalavras {
 		}
 	}
 	
-	private int getPalavraId(String palavra) {
+	private String normalizeLine(String line) {
+		line = Normalizer.normalize(line, Normalizer.Form.NFD);
+		line = line.replaceAll("[\\p{InCombiningDiacriticalMarks}]", "");
+		line = line.replaceAll("[^a-zA-Z ]", " ");
+		line = line.toLowerCase();
+		return line;
+	}
+
+	private synchronized int getPalavraId(String palavra) {
 		int id = 0;
 		if (this.hashPalavras.containsKey(palavra)) {
 			id = this.hashPalavras.get(palavra);
@@ -146,14 +211,10 @@ public class IndexPalavras {
 		return id;
 	}
 	
-	private int getLivroId(String livro) {
-		int id = 0;
-		if (this.hashLivros.containsKey(livro)) {
-			id = this.hashLivros.get(livro);
-		} else {
-			id = this.getNextPalavraId();
-			this.hashLivros.put(livro, id);
-		}
+	private synchronized int getLivroId(String livro) {
+		// Não é necessário checar se já exste, nunca vai repetir o mesmo livro
+		int id = this.getNextLivroId();
+		this.hashLivros.put(id, livro);
 		return id;
 	}
 	
