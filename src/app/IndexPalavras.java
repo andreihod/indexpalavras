@@ -45,24 +45,31 @@ public class IndexPalavras {
 			}
 		} while(true);
 		
-		System.out.println("Encerrando");
+		System.out.println("Encerrado.");
 
 	}
 	private int getMenuOption() {
 		Integer opc = 0;
-		Scanner keyboard = new Scanner(System.in);
-		
+		print("========================================");
+		print("Digite uma opção:");
+		print("1 - Buscar palavra");
+		print("2 - Reindexar");
+		print("0 - Sair");
+
 		do {
-			print("========================================");
-			print("Digite uma opção:");
-			print("1 - Buscar palavra");
-			print("2 - Reindexar");
-			print("0 - Sair");
-			System.out.print("Opção: ");
-			opc = Integer.parseInt(keyboard.nextLine());
-		} while(opc < 0 && opc > 2);
-		keyboard.close();
-		
+			String input = Util.inputRead("Opção: ");
+			try {
+				opc = Integer.parseInt(input);
+				if (opc > 2 || opc < 0) {
+					print("Opção inválida.");
+				} else {
+					break;
+				}
+			} catch(Exception ex) {
+				ex.printStackTrace();
+			}
+		} while(true);
+	
 		return opc;
 	}
 	
