@@ -1,11 +1,11 @@
 package app;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Set;
+import java.util.HashSet;
 
-public class Palavra {
+public class Livro {
 	private Integer id;
-	private Map<Integer, Livro> livros = new ConcurrentHashMap<>();
+	private Set<Integer> linhas = new HashSet<>();
 
 	public Integer getId() {
 		return id;
@@ -15,12 +15,12 @@ public class Palavra {
 		this.id = id;
 	}
 
-	public Map<Integer, Livro> getLivros() {
-		return livros;
+	public Set<Integer> getLinhas() {
+		return linhas;
 	}
 
-	public void setLivros(Map<Integer, Livro> livros) {
-		this.livros = livros;
+	public void setLinhas(Set<Integer> linhas) {
+		this.linhas = linhas;
 	}
 
 	@Override
@@ -39,7 +39,7 @@ public class Palavra {
 			return false;
 		if (getClass() != obj.getClass())
 			return false;
-		Palavra other = (Palavra) obj;
+		Livro other = (Livro) obj;
 		if (id == null) {
 			if (other.id != null)
 				return false;
