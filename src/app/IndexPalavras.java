@@ -15,6 +15,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
@@ -219,13 +220,15 @@ public class IndexPalavras {
 			fw.write(linha + "\n");
 		}
 		
+		print("INDEX SALVO!");
+		
 		fw.close();
 	}
 	
 	private void processaMenuOption(int option) throws Exception {
 		switch(option) {
 			case 1: 
-				//doBuscarPalavras();
+				doBuscarPalavras();
 				break;
 			case 2:
 				doReindexar();
@@ -233,17 +236,37 @@ public class IndexPalavras {
 		}
 	}
 		
+	private void doBuscarPalavras() {
+		String palavra = Util.inputRead("Digite a palavra: ");
+		palavra = palavra.toLowerCase();
+		if (hashPalavras.containsKey(palavra)){
+			int palavraId = hashPalavras.get(palavra);
+			Palavra p = palavras.get(palavraId);
+			Map<Integer, Livro> livros = p.getLivros();		
+			this.percorreLivros(palavra, livros);
+		} else {
+			print("Palavra não encontrada! =(");
+		}			
+	}
+	
+	private void percorreLivros(String palavra, Map<Integer, Livro> livros) {
+		for (Entry<Integer, Livro> entryLivro : livros.entrySet()) {
+			Livro livro = entryLivro.getValue();
+			Set<Integer> linhas = livro.getLinhas();
+			this.printLinhasLivro(palavra, this.hashLivros.get(livro.getId()), Util.asSortedList(linhas));
+		}
+	}
+
 	private void print(String str) {
 		System.out.println(str);
 	}
 	
-	private void buscaLinhasLivro(String palavra, String filename, List<Integer> linhasEncontradas) {
+	private void printLinhasLivro(String palavra, String filename, List<Integer> linhasEncontradas) {
 		try {
 			FileReader fr = new FileReader(LIVROS_PATH + filename);
 			BufferedReader bfr = new BufferedReader(fr);
 			String line = "";
 			int lineNumber = 0; // controla o número da linha
-			Collections.sort(linhasEncontradas);
 			int firstLine = linhasEncontradas.get(0);
 			int lastLine = linhasEncontradas.get(linhasEncontradas.size()-1);
 			
@@ -261,8 +284,10 @@ public class IndexPalavras {
 					break;
 				}
 			}
+			
 			bfr.close();
 			fr.close();
+			
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
