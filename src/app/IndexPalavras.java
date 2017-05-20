@@ -229,6 +229,8 @@ public class IndexPalavras {
 		this.hashLivros.clear();
 		this.indexPrincipal.clear();
 		
+		print("== Iniciado processo para indexar os livros ==");
+		
 		File folder = new File(LIVROS_PATH);
 		
 		File[] listFiles;
