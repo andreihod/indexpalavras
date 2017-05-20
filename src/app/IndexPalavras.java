@@ -7,11 +7,8 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.text.Normalizer;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -23,7 +20,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 
 public class IndexPalavras {
-	
+	private final String INDEX_FILE = "INDEX.csv";
+	private final String LIVROS_FILE = "LIVROS.csv";
+	private final String PALAVRAS_FILE = "PALAVRAS.csv";
+		
 	private int wpc = 0;
 	private Integer processados = 0;
 	
@@ -34,7 +34,7 @@ public class IndexPalavras {
 	// Guarda o id da palavra e o livro/linha onde se encontra
 //	private Map<Integer, Map<Integer, List<Integer>>> hashPalavraLivros = new ConcurrentHashMap<>();
 	
-	private Map<Integer, Palavra> palavras = new ConcurrentHashMap<>();
+	private Map<Integer, Palavra> indexPrincipal = new ConcurrentHashMap<>();
 	
 	
 	private int lastPalavraId = 0;
@@ -43,6 +43,13 @@ public class IndexPalavras {
 	private final String LIVROS_PATH = "./livros/";
 	
 	public IndexPalavras() throws Exception {
+		
+		try {
+			doCarregarIndex();
+		} catch(Exception ex) {
+			print("[-] " + ex.getMessage());
+			doReindexar();
+		}
 		
 		int opc = 0;
 		do {
@@ -109,7 +116,110 @@ public class IndexPalavras {
 //		} while(!exit);
 //		keyboard.close();
 //	}
+	
+	
+	private void doCarregarIndex() throws Exception {
+		File fpLivros = new File(LIVROS_FILE);
+		File fpPalavras = new File(PALAVRAS_FILE);
+		File fpIndex = new File(INDEX_FILE);
+		
+		if (!(fpLivros.exists() && fpLivros.canRead() 
+				&& fpPalavras.exists() && fpPalavras.canRead()
+				&& fpIndex.exists() && fpIndex.canRead())) {
+		
+			throw new Exception("Não foi encontrado os arquivos necessários para a carga do index.");			
+		}
+		
+		long t1 = System.nanoTime();
+		
+		print("== Iniciando a carregamento do index em memória. ==");
+		print("Lendo o arquivo " + LIVROS_FILE);
+		FileReader fReader = new FileReader(fpLivros);
+		BufferedReader bfReader = new BufferedReader(fReader);
+		String linha = "";
+		this.hashLivros.clear();
+		
+		
+		int contador = 0;
+		while ((linha = bfReader.readLine()) != null) {
+			String row[] = linha.split(";");
+			hashLivros.put(Integer.parseInt(row[0]), row[1]);
+			contador++;
+		}
+		
+		bfReader.close();
+		fReader.close();
+		print("Total de " + contador + " livros carregados.");
+		
+		contador = 0;
+		
+		print("Lendo o arquivo " + PALAVRAS_FILE);
+		
+		fReader = new FileReader(fpPalavras);
+		bfReader = new BufferedReader(fReader);
+		hashPalavras.clear();
+		while ((linha = bfReader.readLine()) != null) {
+			String row[] = linha.split(";");
+			hashPalavras.put(row[1], Integer.parseInt(row[0]));
+			contador++;
+		}
+		
+		bfReader.close();
+		fReader.close();
+		print("Total de " + contador + " palavras carregadas.");
+		
+		print("Lendo o arquivo " + INDEX_FILE);
+		
+		fReader = new FileReader(fpIndex);
+		bfReader = new BufferedReader(fReader);
+		
+		indexPrincipal = new HashMap<>(); //Apenas para acelerar o processo!
 
+		contador = 0;
+		while ((linha = bfReader.readLine()) != null) {
+			String row[] = linha.split(";");
+			int palavraId = Integer.parseInt(row[0]);
+			int livroId = Integer.parseInt(row[1]);
+			String linhas[] = row[2].split(",");
+			
+			Palavra palavra = indexPrincipal.get(palavraId);
+			if (palavra == null) {
+				palavra = new Palavra();
+				palavra.setId(palavraId);
+			}
+			
+			Map<Integer, Livro> livros = palavra.getLivros();
+			Livro livro = new Livro();
+			livro.setId(livroId);
+			
+			for (String strLinha : linhas) {
+				int linhaNumber = Integer.parseInt(strLinha);
+				livro.getLinhas().add(linhaNumber);	
+			}
+			livros.put(livroId, livro);
+			palavra.setLivros(livros);
+			
+			indexPrincipal.put(palavraId, palavra);
+			contador++;
+		}
+		
+		bfReader.close();
+		fReader.close();
+		print("Total de " + contador + " palavras indexadas.");
+		
+		indexPrincipal = new ConcurrentHashMap<>(indexPrincipal);
+		
+		long t2 = System.nanoTime();
+		
+		print("Conferindo Index: ");
+		print("Total de Livros carregados (dicionario): " + hashLivros.size());
+		print("Total de Palavras carregados (dicionario): " + hashPalavras.size());
+		print("Total de palavras Indexadas.: " + indexPrincipal.size());
+		print("Tempo total de carregamento:  " + ((t2 - t1) / 1000000.0));
+		
+		
+	}
+	
 	private void doReindexar() throws Exception {
 		long t1 = 0;
 		long t2 = 0;
@@ -117,7 +227,7 @@ public class IndexPalavras {
 		this.lastPalavraId = 0;
 		this.hashPalavras.clear();
 		this.hashLivros.clear();
-		this.palavras.clear();
+		this.indexPrincipal.clear();
 		
 		File folder = new File(LIVROS_PATH);
 		
@@ -150,9 +260,9 @@ public class IndexPalavras {
 		
 		t2 = System.nanoTime();
 		
-		System.out.println("Número de palavras: " + hashPalavras.size());
-		System.out.println("Número de Livros: " + hashLivros.size());	
-		System.out.println("Time Indexing " + ((t2 - t1) / 1000000.0));
+		print("Número de palavras: " + hashPalavras.size());
+		print("Número de Livros: " + hashLivros.size());	
+		print("Tempo total Indexando:  " + ((t2 - t1) / 1000000.0));
 		
 		ordenarIndex();
 		salvarIndex();
@@ -161,10 +271,10 @@ public class IndexPalavras {
 	private void ordenarIndex() {
 		print("Sorting... ");
 		long t1 = System.nanoTime();
-		Map<Integer, Palavra> treeMap = new TreeMap<>(palavras);
-		palavras = new ConcurrentHashMap<Integer, Palavra>(treeMap);
+		Map<Integer, Palavra> treeMap = new TreeMap<>(indexPrincipal);
+		indexPrincipal = new ConcurrentHashMap<Integer, Palavra>(treeMap);
 		treeMap = null;
-		palavras.forEach((key, palavra) -> {
+		indexPrincipal.forEach((key, palavra) -> {
 			Map<Integer, Livro> livros = new TreeMap<>(palavra.getLivros());
 			livros.forEach((key2, obj) -> {
 				obj.setLinhas(new HashSet<>(new TreeSet<>(obj.getLinhas())));
@@ -182,16 +292,18 @@ public class IndexPalavras {
 	}
 	
 	private void salvarIndex() throws IOException {
-		print("Salvando Livros IDs... ");
-		File fp = new File("LIVROS_ID.csv");
+		print("Salvando Livros no arquivo " + LIVROS_FILE + " ...");
+
+		long t1 = System.nanoTime();
+		File fp = new File(LIVROS_FILE);
 		FileWriter fw = new FileWriter(fp);
 		for (Entry<Integer, String> livro : hashLivros.entrySet()) {
 			fw.write(livro.getKey() + ";" + livro.getValue() + "\n");			
 		}
 		fw.close();
 		
-		print("Salvando Palavras IDs... ");
-		fp = new File("PALAVRAS_ID.csv");
+		print("Salvando Palavras no arquivo " + PALAVRAS_FILE + " ...");
+		fp = new File(PALAVRAS_FILE);
 		fw = new FileWriter(fp);
 		
 		Map<Integer, String> listTemp = new TreeMap<>();
@@ -204,25 +316,27 @@ public class IndexPalavras {
 		}		
 		fw.close();
 		
-		print("Salvando INDEX... ");
-		fp = new File("INDEX.csv");
+		print("Salvando INDEX no arquivo " + INDEX_FILE + " ...");
+		fp = new File(INDEX_FILE);
 		fw = new FileWriter(fp);
-		for (Entry<Integer, Palavra> entryPalavra : palavras.entrySet()) {
+		for (Entry<Integer, Palavra> entryPalavra : indexPrincipal.entrySet()) {
 			Palavra palavra = entryPalavra.getValue();
-			String linha = String.format("%d;", palavra.getId());
+			String linha = "";
 			for (Livro livro : entryPalavra.getValue().getLivros().values()) {
-				linha += livro.getId() + ";";
+				linha = palavra.getId() + ";" + livro.getId() + ";";
 				for (Integer x : livro.getLinhas()) {
 					linha += x + ",";
 				}
 				linha = linha.substring(0, linha.length() -1);
+				fw.write(linha + "\n");
 			}
-			fw.write(linha + "\n");
 		}
-		
-		print("INDEX SALVO!");
-		
 		fw.close();
+		
+		long t2 = System.nanoTime();		
+		print("INDEX SALVO!");
+		print("Tempo total para salvar os dados: " + ((t2 - t1) / 1000000.0));
+		
 	}
 	
 	private void processaMenuOption(int option) throws Exception {
@@ -241,7 +355,7 @@ public class IndexPalavras {
 		palavra = palavra.toLowerCase();
 		if (hashPalavras.containsKey(palavra)){
 			int palavraId = hashPalavras.get(palavra);
-			Palavra p = palavras.get(palavraId);
+			Palavra p = indexPrincipal.get(palavraId);
 			Map<Integer, Livro> livros = p.getLivros();		
 			this.percorreLivros(palavra, livros);
 		} else {
@@ -269,18 +383,17 @@ public class IndexPalavras {
 			int lineNumber = 0; // controla o número da linha
 			int firstLine = linhasEncontradas.get(0);
 			int lastLine = linhasEncontradas.get(linhasEncontradas.size()-1);
-			
 			while ((line = bfr.readLine()) != null) {
 				line = this.normalizeLine(line); // usando a mesma normalização da indexação
 				
 				//A primeira condição é tende a ser mais rápida, eliminando a segunda quando não necessário. 
-				if (firstLine >= lineNumber && linhasEncontradas.contains(lineNumber))	{			
-					System.out.println(filename + " | linha " + lineNumber + " -> " + line.replaceAll("\\b"+palavra+"\\b", "<<"+palavra+">>"));
+				if (lineNumber >= firstLine && linhasEncontradas.contains(lineNumber))	{			
+					System.out.println(String.format("%-20s | %5d -> %s", filename, lineNumber, line.replaceAll("\\b"+palavra+"\\b", "<<"+palavra+">>")));
 				}
 				lineNumber++;
 				
 				//Evita percorrer o livro até o final, quando não necessário.
-				if (lineNumber > lastLine) {
+				if (lastLine <= lineNumber - 1) {
 					break;
 				}
 			}
@@ -313,7 +426,7 @@ public class IndexPalavras {
 					if (str.length() > 0 && str.length() < 30) {	
 						// Coloca palavra no hash (se não existe) e retorna um id
 						int palavraId = this.getPalavraId(str);
-						Palavra palavra = palavras.get(palavraId);
+						Palavra palavra = indexPrincipal.get(palavraId);
 						
 						if (palavra == null) {
 							palavra = new Palavra();
@@ -322,7 +435,7 @@ public class IndexPalavras {
 							livro.setId(livroId);
 							livro.getLinhas().add(lineNumber);
 							palavra.getLivros().put(livroId, livro);
-							palavras.put(palavraId, palavra);
+							indexPrincipal.put(palavraId, palavra);
 						} else {
 							Livro livro = palavra.getLivros().get(livroId);
 							if (livro == null) {
@@ -345,64 +458,7 @@ public class IndexPalavras {
 			e.printStackTrace();
 		}
 	}
-	/*
-	private void processaArquivo(String filename) {
-		try {
-			FileReader fr = new FileReader(LIVROS_PATH + filename);
-			BufferedReader bfr = new BufferedReader(fr);
-			
-			// Colocar livro no hash de livros gerando um id
-			int livroId = this.getLivroId(filename);
-
-			String line = "";
-
-			int lineNumber = 0; // controla o número da linha
-			while ((line = bfr.readLine()) != null) {
-				
-				line = this.normalizeLine(line);
-				String strs[] = line.split(" ");
-				
-				for (String str : strs) {
-					if (str.length() > 0 && str.length() < 30) {	
-						
-						// Coloca palavra no hash (se não existe) e retorna um id
-						int palavraId = this.getPalavraId(str);
-						
-						if (this.hashPalavraLivros.containsKey(palavraId)) { // Palavra já existe
-							Map<Integer, List<Integer>> livroLinhas = this.hashPalavraLivros.get(palavraId);
-							if (livroLinhas.containsKey(livroId)) { // Livro já existe na palavra
-								List<Integer> linhas = livroLinhas.get(livroId);
-								if (!linhas.contains(lineNumber)){ // Caso exista a mesma palavra no mesmo livro e na mesma linha 
-									linhas.add(lineNumber); // Adiciona linha
-								}
-							} else {
-								List<Integer> linhas = new ArrayList<>();
-								linhas.add(lineNumber);
-								livroLinhas.put(livroId, linhas);
-							}
-						} else {
-							//Map<Integer, List<Integer>> livroLinhas = new ConcurrentHashMap<Integer, List<Integer>>();
-							Map<Integer, List<Integer>> livroLinhas = new HashMap<Integer, List<Integer>>();
-							List<Integer> linhas = new ArrayList<>();
-							linhas.add(lineNumber);
-							livroLinhas.put(livroId, linhas);
-							this.hashPalavraLivros.put(palavraId, livroLinhas);
-						}
-						wpc++;
-					}
-				}
-				lineNumber++;
-			}
-			bfr.close();
-			fr.close();
-		} catch (FileNotFoundException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
-	*/
-	
+		
 	private String normalizeLine(String line) {
 		line = Normalizer.normalize(line, Normalizer.Form.NFD);
 		line = line.replaceAll("[\\p{InCombiningDiacriticalMarks}]", "");
