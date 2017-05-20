@@ -249,13 +249,18 @@ public class IndexPalavras {
 		
 		final int tamanhoTotal = listFiles.length;
 		
-		ThreadPoolExecutor execService = (ThreadPoolExecutor) Executors.newFixedThreadPool(4);
+		ThreadPoolExecutor execService = (ThreadPoolExecutor) Executors.newFixedThreadPool(8);
 		for (File fp : listFiles) {
 			execService.execute(() -> {
 				String filename = fp.getName();
 				long t4 = System.nanoTime();
 				processaArquivo(filename);
 				long t5 = System.nanoTime();
+				if ((processados % 500) == 0) {
+					print("Gerado GC..... ");
+					System.gc();
+				}
+
 				System.out.println((++processados)+"/"+tamanhoTotal+" Time " + ((t5 - t4) / 1000000.0) +" WPC "+ ++wpc +" -> " + filename);
 			});
 		}
