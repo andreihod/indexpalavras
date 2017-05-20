@@ -1,11 +1,14 @@
 package app;
 
+import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.text.Normalizer;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -68,17 +71,17 @@ public class IndexPalavras {
 	private int getMenuOption() {
 		Integer opc = 0;
 		print("========================================");
-		print("Digite uma opção:");
+		print("Digite uma opÃ§Ã£o:");
 		print("1 - Buscar palavra");
 		print("2 - Reindexar");
 		print("0 - Sair");
 
 		do {
-			String input = Util.inputRead("Opção: ");
+			String input = Util.inputRead("OpÃ§Ã£o: ");
 			try {
 				opc = Integer.parseInt(input);
 				if (opc > 2 || opc < 0) {
-					print("Opção inválida.");
+					print("OpÃ§Ã£o invÃ¡lida.");
 				} else {
 					break;
 				}
@@ -99,7 +102,7 @@ public class IndexPalavras {
 //			if (!"0".equals(palavra)) {
 //				palavra = palavra.toLowerCase();
 //				if (!hashPalavras.containsKey(palavra)){
-//					System.out.println("Palavra não encontrada!");
+//					System.out.println("Palavra nï¿½o encontrada!");
 //				} else {
 //					int idPalavra = hashPalavras.get(palavra);
 //					Map<Integer, List<Integer>> livrosEncontrados = hashPalavraLivros.get(idPalavra);
@@ -127,12 +130,12 @@ public class IndexPalavras {
 				&& fpPalavras.exists() && fpPalavras.canRead()
 				&& fpIndex.exists() && fpIndex.canRead())) {
 		
-			throw new Exception("Não foi encontrado os arquivos necessários para a carga do index.");			
+			throw new Exception("NÃ£o foi encontrado os arquivos necessÃ¡rios para a carga do index.");			
 		}
 		
 		long t1 = System.nanoTime();
 		
-		print("== Iniciando a carregamento do index em memória. ==");
+		print("== Iniciando a carregamento do index em memÃ³ria. ==");
 		print("Lendo o arquivo " + LIVROS_FILE);
 		FileReader fReader = new FileReader(fpLivros);
 		BufferedReader bfReader = new BufferedReader(fReader);
@@ -238,7 +241,7 @@ public class IndexPalavras {
 		if (folder.exists() && folder.canRead()) {
 			listFiles = folder.listFiles();
 		} else {			
-			throw new Exception("Não foi possível abrir a pasta ./livros/");
+			throw new Exception("NÃ£o foi possÃ­vel abrir a pasta ./livros/");
 		}
 		
 		
@@ -246,7 +249,7 @@ public class IndexPalavras {
 		
 		final int tamanhoTotal = listFiles.length;
 		
-		ThreadPoolExecutor execService = (ThreadPoolExecutor) Executors.newFixedThreadPool(16);
+		ThreadPoolExecutor execService = (ThreadPoolExecutor) Executors.newFixedThreadPool(4);
 		for (File fp : listFiles) {
 			execService.execute(() -> {
 				String filename = fp.getName();
@@ -262,8 +265,8 @@ public class IndexPalavras {
 		
 		t2 = System.nanoTime();
 		
-		print("Número de palavras: " + hashPalavras.size());
-		print("Número de Livros: " + hashLivros.size());	
+		print("NÃºmero de palavras: " + hashPalavras.size());
+		print("NÃºmero de Livros: " + hashLivros.size());	
 		print("Tempo total Indexando:  " + ((t2 - t1) / 1000000.0));
 		
 		ordenarIndex();
@@ -284,8 +287,8 @@ public class IndexPalavras {
 			palavra.setLivros(new ConcurrentHashMap<>(livros));
 		});
 		
-		//Não terá sorting do hash de palavras, pois o ID é o valor. Um HashMap não garante a ordenação de valores
-		// A ordenação será feita no metodo salvarIndex()
+		//NÃ£o terÃ¡ sorting do hash de palavras, pois o ID Ã© o valor. Um HashMap nÃ£o garante a ordenaÃ§Ã£o de valores
+		// A ordenaÃ§Ã£o serÃ¡ feita no metodo salvarIndex()
 		hashLivros = new HashMap<>(new TreeMap<>(hashLivros));
 
 		long t2 = System.nanoTime();		
@@ -319,8 +322,9 @@ public class IndexPalavras {
 		fw.close();
 		
 		print("Salvando INDEX no arquivo " + INDEX_FILE + " ...");
-		fp = new File(INDEX_FILE);
-		fw = new FileWriter(fp);
+		fw = new FileWriter(INDEX_FILE);
+		PrintWriter pw = new PrintWriter(new BufferedWriter(fw));
+		
 		for (Entry<Integer, Palavra> entryPalavra : indexPrincipal.entrySet()) {
 			Palavra palavra = entryPalavra.getValue();
 			String linha = "";
@@ -330,9 +334,10 @@ public class IndexPalavras {
 					linha += x + ",";
 				}
 				linha = linha.substring(0, linha.length() -1);
-				fw.write(linha + "\n");
+				pw.write(linha + "\n");
 			}
 		}
+		pw.close();
 		fw.close();
 		
 		long t2 = System.nanoTime();		
@@ -367,7 +372,7 @@ public class IndexPalavras {
 					Map<Integer, Livro> livros = p.getLivros();		
 					this.percorreLivros(palavra, livros);
 				} else {
-					print("Palavra não encontrada! =(");
+					print("Palavra nÃ£o encontrada! =(");
 				}	
 			}
 		} while(!"".equals(palavra));
@@ -390,19 +395,19 @@ public class IndexPalavras {
 			FileReader fr = new FileReader(LIVROS_PATH + filename);
 			BufferedReader bfr = new BufferedReader(fr);
 			String line = "";
-			int lineNumber = 0; // controla o número da linha
+			int lineNumber = 0; // controla o nï¿½mero da linha
 			int firstLine = linhasEncontradas.get(0);
 			int lastLine = linhasEncontradas.get(linhasEncontradas.size()-1);
 			while ((line = bfr.readLine()) != null) {
-				line = this.normalizeLine(line); // usando a mesma normalização da indexação
+				line = this.normalizeLine(line); // usando a mesma normalizaï¿½ï¿½o da indexaï¿½ï¿½o
 				
-				//A primeira condição é tende a ser mais rápida, eliminando a segunda quando não necessário. 
+				//A primeira condiï¿½ï¿½o ï¿½ tende a ser mais rï¿½pida, eliminando a segunda quando nï¿½o necessï¿½rio. 
 				if (lineNumber >= firstLine && linhasEncontradas.contains(lineNumber))	{			
 					System.out.println(String.format("%-20s | %5d -> %s", filename, lineNumber, line.replaceAll("\\b"+palavra+"\\b", "<<"+palavra+">>")));
 				}
 				lineNumber++;
 				
-				//Evita percorrer o livro até o final, quando não necessário.
+				//Evita percorrer o livro atï¿½ o final, quando nï¿½o necessï¿½rio.
 				if (lastLine <= lineNumber - 1) {
 					break;
 				}
@@ -426,7 +431,7 @@ public class IndexPalavras {
 
 			String line = "";
 
-			int lineNumber = 0; // controla o número da linha
+			int lineNumber = 0; // controla o nï¿½mero da linha
 			while ((line = bfr.readLine()) != null) {
 				
 				line = this.normalizeLine(line);
@@ -434,7 +439,7 @@ public class IndexPalavras {
 				
 				for (String str : strs) {
 					if (str.length() > 0 && str.length() < 30) {	
-						// Coloca palavra no hash (se não existe) e retorna um id
+						// Coloca palavra no hash (se nï¿½o existe) e retorna um id
 						int palavraId = this.getPalavraId(str);
 						Palavra palavra = indexPrincipal.get(palavraId);
 						
@@ -489,7 +494,7 @@ public class IndexPalavras {
 	}
 	
 	private synchronized int getLivroId(String livro) {
-		// Não é necessário checar se já exste, nunca vai repetir o mesmo livro
+		// Nï¿½o ï¿½ necessï¿½rio checar se jï¿½ exste, nunca vai repetir o mesmo livro
 		int id = this.getNextLivroId();
 		this.hashLivros.put(id, livro);
 		return id;
