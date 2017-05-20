@@ -353,16 +353,24 @@ public class IndexPalavras {
 	}
 		
 	private void doBuscarPalavras() {
-		String palavra = Util.inputRead("Digite a palavra: ");
-		palavra = palavra.toLowerCase();
-		if (hashPalavras.containsKey(palavra)){
-			int palavraId = hashPalavras.get(palavra);
-			Palavra p = indexPrincipal.get(palavraId);
-			Map<Integer, Livro> livros = p.getLivros();		
-			this.percorreLivros(palavra, livros);
-		} else {
-			print("Palavra não encontrada! =(");
-		}			
+		
+		String palavra = "";
+		print("== Sistema de Busca ==");
+		do {
+			palavra = Util.inputRead("Digite uma palavra (enter para sair): ");
+			
+			if (palavra != null && !"".equals(palavra)) {
+				palavra = palavra.toLowerCase();
+				if (hashPalavras.containsKey(palavra)){
+					int palavraId = hashPalavras.get(palavra);
+					Palavra p = indexPrincipal.get(palavraId);
+					Map<Integer, Livro> livros = p.getLivros();		
+					this.percorreLivros(palavra, livros);
+				} else {
+					print("Palavra não encontrada! =(");
+				}	
+			}
+		} while(!"".equals(palavra));
 	}
 	
 	private void percorreLivros(String palavra, Map<Integer, Livro> livros) {
